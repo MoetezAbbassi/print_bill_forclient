@@ -1,135 +1,140 @@
 package com.example.billprintapp.ui
 
+import android.content.Context
+import android.graphics.Bitmap
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
-import com.example.billprintapp.models.Customer
-import com.example.billprintapp.models.Item
-import com.example.billprintapp.ui.theme.components.DropdownMenuDemo
-import java.text.SimpleDateFormat
-import java.util.*
-
-val customers = listOf(Customer("Alice"), Customer("Bob"), Customer("Charlie"))
-val items = listOf(
-    Item("Item A", 10.0),
-    Item("Item B", 15.0),
-    Item("Item C", 8.5)
-)
+import com.example.billprintapp.models.EditableItem
+import com.example.billprintapp.utils.PdfGenerator
+import com.example.billprintapp.utils.PdfRendererUtil
+import com.example.billprintapp.utils.ReceiptBuilder
+import java.io.File
 
 @Composable
 fun ReceiptPrinterScreen(
     onPrintThermal: (String) -> Unit,
-    onPrintPdf: (String) -> Unit
+    onPrintPdf: (String) -> Unit,
+    onSendPdfFile: (File) -> Unit
 ) {
     val context = LocalContext.current
-    var selectedCustomer by remember { mutableStateOf(customers.first()) }
-    val quantities = remember { mutableStateListOf(0, 0, 0) }
-    var status by remember { mutableStateOf("Idle") }
-    var loading by remember { mutableStateOf(false) }
-    var startPrint by remember { mutableStateOf(false) }
-    var format by remember { mutableStateOf("Thermal") }
+    val prefs = remember { context.getSharedPreferences("receipt_prefs", Context.MODE_PRIVATE) }
 
-    LaunchedEffect(startPrint) {
-        if (startPrint) {
-            status = "Preparing receipt..."
-            loading = true
-            kotlinx.coroutines.delay(1500)
-            val receipt = createReceiptText(selectedCustomer, items, quantities)
-            if (format == "Thermal") onPrintThermal(receipt) else onPrintPdf(receipt)
-            status = "Printed successfully!"
-            loading = false
-            startPrint = false
-        }
-    }
+    var customerName by remember { mutableStateOf("") }
+    val items = remember { mutableStateListOf(EditableItem("ICE", 4.0, 1)) }
+    var format by remember { mutableStateOf(prefs.getString("print_format", "PDF") ?: "PDF") }
+
+    var previewText by remember { mutableStateOf("") }
+    var pdfBitmap by remember { mutableStateOf<Bitmap?>(null) }
+    var showPreview by remember { mutableStateOf(false) }
+    var pdfFile by remember { mutableStateOf<File?>(null) }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(24.dp),
-        verticalArrangement = Arrangement.Top
+            .padding(16.dp)
     ) {
-        Text("Select Customer:")
-        DropdownMenuDemo(selectedCustomer) { selectedCustomer = it }
+        Text("Customer Name:")
+        TextField(
+            value = customerName,
+            onValueChange = { customerName = it },
+            modifier = Modifier.fillMaxWidth()
+        )
 
         Spacer(Modifier.height(16.dp))
-        Text("Enter Quantities:")
+        Text("Items:")
 
         items.forEachIndexed { index, item ->
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.padding(vertical = 8.dp)
-            ) {
-                Text("${item.name} ($${item.price})", modifier = Modifier.weight(1f))
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 4.dp)) {
                 TextField(
-                    value = quantities[index].toString(),
+                    value = item.name,
+                    onValueChange = { items[index] = item.copy(name = it) },
+                    label = { Text("Name") },
+                    modifier = Modifier.weight(1f)
+                )
+                Spacer(Modifier.width(8.dp))
+                TextField(
+                    value = item.price.toString(),
                     onValueChange = {
-                        quantities[index] = it.toIntOrNull() ?: 0
+                        items[index] = item.copy(price = it.toDoubleOrNull() ?: 0.0)
                     },
-                    modifier = Modifier.width(80.dp),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                    label = { Text("Price") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    modifier = Modifier.width(100.dp)
+                )
+                Spacer(Modifier.width(8.dp))
+                TextField(
+                    value = item.quantity.toString(),
+                    onValueChange = {
+                        items[index] = item.copy(quantity = it.toIntOrNull() ?: 0)
+                    },
+                    label = { Text("Qty") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    modifier = Modifier.width(80.dp)
                 )
             }
         }
 
-        Spacer(Modifier.height(16.dp))
-        Text("Print Format:")
-        Row {
-            RadioButton(selected = format == "Thermal", onClick = { format = "Thermal" })
-            Text("Thermal", modifier = Modifier.padding(end = 16.dp))
-            RadioButton(selected = format == "PDF", onClick = { format = "PDF" })
-            Text("PDF")
+        Button(onClick = { items.add(EditableItem()) }, modifier = Modifier.padding(vertical = 8.dp)) {
+            Text("Add Item")
         }
 
-        Spacer(Modifier.height(16.dp))
-        Text(status)
+        Spacer(Modifier.height(8.dp))
 
-        if (loading) {
-            CircularProgressIndicator()
-        } else {
-            Button(onClick = { startPrint = true }) {
-                Text("Print Receipt")
+        Button(
+            onClick = {
+                if (customerName.isBlank() || items.none { it.name.isNotBlank() && it.quantity > 0 }) return@Button
+
+                previewText = ReceiptBuilder.createFancyReceiptText(customerName, items)
+
+                val file = PdfGenerator.generatePdf(context, previewText)
+                pdfBitmap = PdfRendererUtil.renderPdfToBitmap(context, file)
+                pdfFile = file
+                showPreview = true
+            },
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text("Send to PDF Printer")
+        }
+
+        Spacer(Modifier.height(12.dp))
+    }
+
+    // 👇 PDF Preview Dialog
+    if (showPreview && pdfBitmap != null) {
+        AlertDialog(
+            onDismissRequest = { showPreview = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    showPreview = false
+                    pdfFile?.let { onSendPdfFile(it) }
+                }) {
+                    Text("Print Now")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showPreview = false }) {
+                    Text("Cancel")
+                }
+            },
+            title = { Text("Preview Receipt") },
+            text = {
+                Image(
+                    bitmap = pdfBitmap!!.asImageBitmap(),
+                    contentDescription = "PDF Preview",
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 300.dp, max = 600.dp)
+                )
             }
-        }
+        )
     }
-}
-
-fun createReceiptText(customer: Customer, items: List<Item>, quantities: List<Int>): String {
-    val sdf = SimpleDateFormat("MM/dd/yyyy HH:mm", Locale.getDefault())
-    val dateStr = sdf.format(Date())
-
-    val sb = StringBuilder()
-    sb.appendLine("FAST BILLS")
-    sb.appendLine("--------------------------")
-    sb.appendLine("Customer: ${customer.name}")
-    sb.appendLine("Date: $dateStr")
-    sb.appendLine("--------------------------")
-
-    var subtotal = 0.0
-    items.forEachIndexed { index, item ->
-        val qty = quantities[index]
-        if (qty > 0) {
-            val totalItemPrice = qty * item.price
-            sb.appendLine("${item.name} x$qty   $${"%.2f".format(totalItemPrice)}")
-            subtotal += totalItemPrice
-        }
-    }
-
-    val tax = subtotal * 0.15
-    val total = subtotal + tax
-
-    sb.appendLine("--------------------------")
-    sb.appendLine("Subtotal       $${"%.2f".format(subtotal)}")
-    sb.appendLine("Tax (15%)      $${"%.2f".format(tax)}")
-    sb.appendLine("--------------------------")
-    sb.appendLine("TOTAL         $${"%.2f".format(total)}")
-    sb.appendLine("--------------------------")
-    sb.appendLine("Thank you for your purchase!")
-
-    return sb.toString()
 }
