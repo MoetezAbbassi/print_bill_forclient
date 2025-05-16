@@ -4,6 +4,7 @@ import android.content.Context
 import android.graphics.*
 import android.graphics.pdf.PdfDocument
 import android.os.Environment
+import com.example.billprintapp.R
 import com.example.billprintapp.models.EditableItem
 import java.io.File
 import java.io.FileOutputStream
@@ -12,7 +13,11 @@ import java.util.*
 
 object PdfGenerator {
 
-    fun generateSmartReceiptPdf(context: Context, customerName: String, items: List<EditableItem>): File {
+    fun generateSmartReceiptPdf(
+        context: Context,
+        customerName: String,
+        items: List<EditableItem>
+    ): File {
         val doc = PdfDocument()
         val pageInfo = PdfDocument.PageInfo.Builder(300, 800, 1).create()
         val page = doc.startPage(pageInfo)
@@ -26,17 +31,17 @@ object PdfGenerator {
         }
 
         val boldPaint = Paint(paint).apply {
-            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            typeface = Typeface.DEFAULT_BOLD
         }
 
         val center = width / 2f
-        var y = 30f
+        var y = 20f
 
-        fun drawCentered(text: String, yPos: Float = y, bold: Boolean = false) {
+        fun drawCentered(text: String, bold: Boolean = false, offset: Float = 18f) {
             val p = if (bold) boldPaint else paint
             val textWidth = p.measureText(text)
-            canvas.drawText(text, center - textWidth / 2f, yPos, p)
-            y += 18f
+            canvas.drawText(text, center - textWidth / 2f, y, p)
+            y += offset
         }
 
         fun drawLeftRight(left: String, right: String) {
@@ -51,12 +56,27 @@ object PdfGenerator {
             y += 10f
         }
 
-        // Header
-        drawLine()
-        drawCentered("Simplified Tax Invoice", bold = true)
-        drawCentered("فاتورة ضريبية مبسطة", bold = true)
+        // ✅ Business Header with Logo
+        val logo = try {
+            BitmapFactory.decodeResource(context.resources, R.drawable.logo)
+        } catch (e: Exception) {
+            null
+        }
+
+        logo?.let {
+            val scaled = Bitmap.createScaledBitmap(it, 100, 100, true)
+            canvas.drawBitmap(scaled, center - 50f, y, null)
+            y += 110f
+        }
+
+        drawCentered("ICE", bold = true)
+        drawCentered("مؤسسة", bold = true)
+        drawCentered("Dammam, SA")
+        drawCentered("VAT num: 300836003")
+        drawCentered("contact: 50000000")
         drawLine()
 
+        // ✅ Invoice Info
         val sdf = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault())
         val dateStr = sdf.format(Date())
         val invoiceId = (100000..999999).random().toString()
@@ -65,9 +85,9 @@ object PdfGenerator {
         drawLeftRight("Date:", dateStr)
         drawLine()
 
-        // Table header
+        // ✅ Table Header
         val columns = listOf("Item", "Qty", "Price", "Total")
-        val colWidths = listOf(80f, 40f, 60f, 60f)
+        val colWidths = listOf(80f, 60f, 60f, 60f)
         var colX = 10f
         columns.forEachIndexed { i, title ->
             canvas.drawText(title, colX, y, boldPaint)
@@ -75,14 +95,16 @@ object PdfGenerator {
         }
         y += 18f
 
+        // ✅ Items
         var subtotal = 0.0
         for (item in items) {
             if (item.name.isBlank() || item.quantity <= 0) continue
             val total = item.quantity * item.price
             colX = 10f
+            val quantityFormatted = "${item.quantity} x 4kg"
             val values = listOf(
                 item.name.take(10),
-                item.quantity.toString(),
+                quantityFormatted,
                 "﷼%.2f".format(item.price),
                 "﷼%.2f".format(total)
             )
@@ -97,6 +119,7 @@ object PdfGenerator {
         y += 10f
         drawLine()
 
+        // ✅ Totals
         val vat = subtotal * 0.15
         val total = subtotal + vat
 
@@ -105,7 +128,7 @@ object PdfGenerator {
         drawLeftRight("TOTAL:", "﷼%.2f".format(total))
         drawLine()
 
-        // QR code with receipt info
+        // ✅ QR Code
         val qrContent = """
             Invoice#: $invoiceId
             Customer: $customerName
@@ -118,7 +141,7 @@ object PdfGenerator {
             canvas.drawBitmap(qrBitmap, center - qrBitmap.width / 2f, y, null)
             y += qrBitmap.height + 20f
         } catch (e: Exception) {
-            drawCentered("QR code error", bold = true)
+            drawCentered("QR CODE ERROR", bold = true)
         }
 
         drawCentered("Thank you for your purchase!")
