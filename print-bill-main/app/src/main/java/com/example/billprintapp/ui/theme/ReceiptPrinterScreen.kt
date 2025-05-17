@@ -16,8 +16,7 @@ import com.example.billprintapp.db.ReceiptDatabase
 import com.example.billprintapp.db.ReceiptEntity
 import com.example.billprintapp.models.EditableItem
 import com.example.billprintapp.utils.BluetoothPrinterHelper
-import com.example.billprintapp.utils.PdfGenerator
-import com.example.billprintapp.utils.PdfRendererUtil
+import com.example.billprintapp.utils.ReceiptBitmapBuilder
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -33,9 +32,8 @@ fun ReceiptPrinterScreen(
     var customerName by remember { mutableStateOf("") }
     val items = remember { mutableStateListOf(EditableItem("ICE", 4.0, 1)) }
 
+    var previewBitmap by remember { mutableStateOf<Bitmap?>(null) }
     var showPreview by remember { mutableStateOf(false) }
-    var pdfBitmap by remember { mutableStateOf<Bitmap?>(null) }
-    var pdfFile by remember { mutableStateOf<java.io.File?>(null) }
 
     Column(modifier = Modifier.padding(16.dp)) {
         Text("Customer Name:")
@@ -83,9 +81,7 @@ fun ReceiptPrinterScreen(
 
         Button(
             onClick = {
-                val file = PdfGenerator.generateSmartReceiptPdf(context, customerName, items)
-                pdfBitmap = PdfRendererUtil.renderPdfToBitmap(context, file)
-                pdfFile = file
+                previewBitmap = ReceiptBitmapBuilder.buildBitmap(customerName, items)
                 showPreview = true
             },
             modifier = Modifier.fillMaxWidth()
@@ -94,14 +90,13 @@ fun ReceiptPrinterScreen(
         }
     }
 
-    if (showPreview && pdfBitmap != null && pdfFile != null) {
+    if (showPreview && previewBitmap != null) {
         AlertDialog(
             onDismissRequest = { showPreview = false },
             confirmButton = {
                 TextButton(onClick = {
                     showPreview = false
 
-                    // Save receipt to database
                     CoroutineScope(Dispatchers.IO).launch {
                         val dao = ReceiptDatabase.getInstance(context).receiptDao()
                         dao.insert(
@@ -114,9 +109,8 @@ fun ReceiptPrinterScreen(
                         )
                     }
 
-                    // Pick printer & print
                     BluetoothPrinterHelper.showDevicePicker(context) {
-                        BluetoothPrinterHelper.printBitmap(context, pdfBitmap!!)
+                        BluetoothPrinterHelper.printBitmap(context, previewBitmap!!)
                     }
 
                 }) {
@@ -131,7 +125,7 @@ fun ReceiptPrinterScreen(
             title = { Text("Receipt Preview") },
             text = {
                 Image(
-                    bitmap = pdfBitmap!!.asImageBitmap(),
+                    bitmap = previewBitmap!!.asImageBitmap(),
                     contentDescription = null,
                     modifier = Modifier
                         .fillMaxWidth()

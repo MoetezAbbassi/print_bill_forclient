@@ -56,18 +56,6 @@ object PdfGenerator {
             y += 10f
         }
 
-        // ✅ Business Header with Logo
-        val logo = try {
-            BitmapFactory.decodeResource(context.resources, R.drawable.logo)
-        } catch (e: Exception) {
-            null
-        }
-
-        logo?.let {
-            val scaled = Bitmap.createScaledBitmap(it, 100, 100, true)
-            canvas.drawBitmap(scaled, center - 50f, y, null)
-            y += 110f
-        }
 
         drawCentered("ICE", bold = true)
         drawCentered("مؤسسة", bold = true)

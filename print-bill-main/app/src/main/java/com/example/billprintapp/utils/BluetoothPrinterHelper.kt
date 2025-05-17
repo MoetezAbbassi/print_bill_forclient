@@ -1,9 +1,7 @@
 package com.example.billprintapp.utils
 
 import android.app.AlertDialog
-import android.bluetooth.BluetoothAdapter
-import android.bluetooth.BluetoothDevice
-import android.bluetooth.BluetoothSocket
+import android.bluetooth.*
 import android.content.Context
 import android.graphics.Bitmap
 import android.widget.Toast
@@ -28,15 +26,16 @@ object BluetoothPrinterHelper {
             return
         }
 
-        val deviceNames = pairedDevices.map { it.name ?: it.address }
-        val builder = AlertDialog.Builder(context)
-        builder.setTitle("Select Printer")
-        builder.setItems(deviceNames.toTypedArray()) { _, which ->
-            selectedDevice = pairedDevices[which]
-            onDeviceSelected(selectedDevice!!)
-        }
-        builder.setNegativeButton("Cancel", null)
-        builder.show()
+        val names = pairedDevices.map { it.name ?: it.address }
+
+        AlertDialog.Builder(context)
+            .setTitle("Select Printer")
+            .setItems(names.toTypedArray()) { _, which ->
+                selectedDevice = pairedDevices[which]
+                onDeviceSelected(selectedDevice!!)
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
     }
 
     fun printBitmap(context: Context, bitmap: Bitmap) {
@@ -47,8 +46,9 @@ object BluetoothPrinterHelper {
         }
 
         try {
-            val uuid = device.uuids?.get(0)?.uuid ?: UUID.fromString("00001101-0000-1000-8000-00805f9b34fb")
-            val socket: BluetoothSocket = device.createRfcommSocketToServiceRecord(uuid)
+            val uuid = device.uuids?.firstOrNull()?.uuid
+                ?: UUID.fromString("00001101-0000-1000-8000-00805f9b34fb")
+            val socket = device.createRfcommSocketToServiceRecord(uuid)
             socket.connect()
 
             val stream: OutputStream = socket.outputStream
@@ -58,7 +58,7 @@ object BluetoothPrinterHelper {
             stream.close()
             socket.close()
 
-            Toast.makeText(context, "Receipt sent to ${device.name}", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, "Printed to ${device.name}", Toast.LENGTH_SHORT).show()
 
         } catch (e: Exception) {
             e.printStackTrace()
