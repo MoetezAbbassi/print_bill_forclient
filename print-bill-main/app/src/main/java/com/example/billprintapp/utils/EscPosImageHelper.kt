@@ -12,10 +12,9 @@ object EscPosImageHelper {
 
         val stream = ByteArrayOutputStream()
 
-        // ✅ Init ESC/POS to prevent junk characters
-        stream.write(byteArrayOf(0x1B, 0x40)) // ESC @
+        // ❌ DO NOT send ESC @ — printer is already initialized
 
-        // ✅ Start raster graphics mode
+        // ESC * raster mode start
         stream.write(byteArrayOf(0x1D, 0x76, 0x30, 0x00))
 
         val bytesPerRow = (bwBitmap.width + 7) / 8
@@ -43,9 +42,8 @@ object EscPosImageHelper {
             }
         }
 
-        // ✅ Line feeds to ensure paper feed stops
-        stream.write(0x0A)
-        stream.write(0x0A)
+        // ✅ Final line feeds to push print out
+        stream.write(byteArrayOf(0x0A, 0x0A, 0x0A))
 
         return stream.toByteArray()
     }
