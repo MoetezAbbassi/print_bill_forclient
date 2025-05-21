@@ -1,69 +1,70 @@
 package com.example.billprintapp.utils
 
-import android.graphics.*
+import android.graphics.Bitmap
+import android.graphics.Color
 import java.io.ByteArrayOutputStream
 
 object EscPosImageHelper {
 
-    fun bitmapToEscPos(original: Bitmap): ByteArray {
-        val width = 576
-        val scaled = Bitmap.createScaledBitmap(original, width, (original.height * width) / original.width, false)
-        val bwBitmap = toMonochrome(scaled)
-
-        val stream = ByteArrayOutputStream()
-
-        // ❌ DO NOT send ESC @ — printer is already initialized
-
-        // ESC * raster mode start
-        stream.write(byteArrayOf(0x1D, 0x76, 0x30, 0x00))
-
-        val bytesPerRow = (bwBitmap.width + 7) / 8
-        val widthLow = bytesPerRow % 256
-        val widthHigh = bytesPerRow / 256
-        val heightLow = bwBitmap.height % 256
-        val heightHigh = bwBitmap.height / 256
-
-        stream.write(byteArrayOf(widthLow.toByte(), widthHigh.toByte(), heightLow.toByte(), heightHigh.toByte()))
-
-        for (y in 0 until bwBitmap.height) {
-            for (x in 0 until bwBitmap.width step 8) {
-                var b = 0
-                for (bit in 0..7) {
-                    val px = x + bit
-                    if (px < bwBitmap.width) {
-                        val color = bwBitmap.getPixel(px, y)
-                        val red = Color.red(color)
-                        if (red == 0) {
-                            b = b or (1 shl (7 - bit))
-                        }
-                    }
-                }
-                stream.write(b)
-            }
-        }
-
-        // ✅ Final line feeds to push print out
-        stream.write(byteArrayOf(0x0A, 0x0A, 0x0A))
-
-        return stream.toByteArray()
+    fun bitmapToEscPos(bitmap: Bitmap): ByteArray {
+        val bw = toBlackAndWhite(bitmap)
+        return convertBitmapToRaster(bw)
     }
 
-    private fun toMonochrome(src: Bitmap): Bitmap {
-        val bw = Bitmap.createBitmap(src.width, src.height, Bitmap.Config.ARGB_8888)
-        val canvas = Canvas(bw)
-        val paint = Paint()
-        val matrix = ColorMatrix().apply { setSaturation(0f) }
-        paint.colorFilter = ColorMatrixColorFilter(matrix)
-        canvas.drawBitmap(src, 0f, 0f, paint)
+    private fun toBlackAndWhite(src: Bitmap): Bitmap {
+        val width = src.width
+        val height = src.height
+        val bwBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
 
-        for (x in 0 until bw.width) {
-            for (y in 0 until bw.height) {
-                val gray = Color.red(bw.getPixel(x, y))
-                val bwColor = if (gray < 160) Color.BLACK else Color.WHITE
-                bw.setPixel(x, y, bwColor)
+        for (y in 0 until height) {
+            for (x in 0 until width) {
+                val pixel = src.getPixel(x, y)
+                val r = Color.red(pixel)
+                val g = Color.green(pixel)
+                val b = Color.blue(pixel)
+                val gray = (r + g + b) / 3
+                val color = if (gray < 160) Color.BLACK else Color.WHITE
+                bwBitmap.setPixel(x, y, color)
             }
         }
 
-        return bw
+        return bwBitmap
+    }
+
+    private fun convertBitmapToRaster(bitmap: Bitmap): ByteArray {
+        val stream = ByteArrayOutputStream()
+        val width = bitmap.width
+        val height = bitmap.height
+
+        val bytesPerRow = (width + 7) / 8
+        val imageBytes = ByteArray(height * bytesPerRow)
+
+        var idx = 0
+        for (y in 0 until height) {
+            for (xByte in 0 until bytesPerRow) {
+                var b = 0
+                for (bit in 0..7) {
+                    val x = xByte * 8 + bit
+                    if (x < width) {
+                        val pixel = bitmap.getPixel(x, y)
+                        val v = if (Color.red(pixel) == 0) 1 else 0
+                        b = b or (v shl (7 - bit))
+                    }
+                }
+                imageBytes[idx++] = b.toByte()
+            }
+        }
+
+        // Add ESC/POS header for raster bit image
+        val escpos = ByteArrayOutputStream()
+        val nL = (bytesPerRow % 256).toByte()
+        val nH = (bytesPerRow / 256).toByte()
+
+        for (y in 0 until height) {
+            escpos.write(byteArrayOf(0x1D, 0x76, 0x30, 0x00, nL, nH, 0x01, 0x00)) // GS v 0
+            escpos.write(imageBytes, y * bytesPerRow, bytesPerRow)
+        }
+
+        return escpos.toByteArray()
     }
 }

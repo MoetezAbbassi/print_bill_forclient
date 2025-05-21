@@ -54,6 +54,7 @@ object BluetoothPrinterHelper {
                 outputStream = socket!!.outputStream
             }
 
+            // ✅ Convert bitmap to black/white ESC/POS
             val bytes = EscPosImageHelper.bitmapToEscPos(bitmap)
             outputStream!!.write(bytes)
             outputStream!!.flush()
