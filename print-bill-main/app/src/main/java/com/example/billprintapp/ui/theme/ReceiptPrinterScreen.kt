@@ -17,7 +17,11 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.example.billprintapp.models.EditableItem
+import com.example.billprintapp.db.ReceiptDatabase
+import com.example.billprintapp.db.ReceiptEntity
 import com.example.billprintapp.utils.ReceiptBitmapBuilder
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 @Composable
 fun ReceiptPrinterScreen(
@@ -39,9 +43,19 @@ fun ReceiptPrinterScreen(
     var quantity by remember { mutableStateOf("1") }
 
     val items = remember { mutableStateListOf<EditableItem>() }
-
     var bitmapPreview by remember { mutableStateOf<Bitmap?>(null) }
     var showPreview by remember { mutableStateOf(false) }
+
+    val scope = rememberCoroutineScope()
+
+    LaunchedEffect(selectedProduct) {
+        price = when (selectedProduct) {
+            "Ice 4kg" -> "4.0"
+            "Ice 2kg" -> "2.0"
+            "ICE Cup" -> "1.0"
+            else -> price
+        }
+    }
 
     Column(modifier = Modifier
         .fillMaxSize()
@@ -162,7 +176,24 @@ fun ReceiptPrinterScreen(
             confirmButton = {
                 TextButton(onClick = {
                     showPreview = false
-                    bitmapPreview?.let { onSendBitmap(it) }
+                    bitmapPreview?.let {
+                        onSendBitmap(it)
+
+                        // ✅ Save to DB (MATCHING ENTITY)
+                        scope.launch(Dispatchers.IO) {
+                            val dao = ReceiptDatabase.getInstance(context).receiptDao()
+                            val total = items.sumOf { it.price * it.quantity }
+                            val entity = ReceiptEntity(
+                                customerName = customerName,
+                                receiptText = "Receipt Printed",
+                                total = total,
+                                timestamp = System.currentTimeMillis()
+                            )
+                            dao.insert(entity)
+                        }
+
+                        items.clear()
+                    }
                 }) {
                     Text("Print Now")
                 }

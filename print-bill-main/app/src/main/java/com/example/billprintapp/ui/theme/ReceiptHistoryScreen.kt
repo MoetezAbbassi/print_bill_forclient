@@ -22,12 +22,13 @@ fun ReceiptHistoryScreen() {
     var receipts by remember { mutableStateOf<List<ReceiptEntity>>(emptyList()) }
 
     LaunchedEffect(true) {
-        receipts = dao.getAll()
+        coroutineScope.launch {
+            receipts = dao.getAll()
+        }
     }
 
     Column(modifier = Modifier.padding(16.dp)) {
         Text("Past Receipts", style = MaterialTheme.typography.headlineSmall)
-
         Spacer(modifier = Modifier.height(12.dp))
 
         LazyColumn {
@@ -41,10 +42,15 @@ fun ReceiptHistoryScreen() {
                     Column(Modifier.padding(12.dp)) {
                         Text("Customer: ${receipt.customerName}")
                         Text("Total: ﷼%.2f".format(receipt.total))
-                        Text("Date: ${SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(Date(receipt.timestamp))}")
+                        Text("Date: ${formatDate(receipt.timestamp)}")
                     }
                 }
             }
         }
     }
+}
+
+fun formatDate(timestamp: Long): String {
+    val sdf = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault())
+    return sdf.format(Date(timestamp))
 }
