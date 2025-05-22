@@ -17,13 +17,11 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.example.billprintapp.models.EditableItem
-import com.example.billprintapp.utils.PdfGenerator
-import com.example.billprintapp.utils.PdfRendererUtil
-import java.io.File
+import com.example.billprintapp.utils.ReceiptBitmapBuilder
 
 @Composable
 fun ReceiptPrinterScreen(
-    onSendPdfFile: (File) -> Unit
+    onSendBitmap: (Bitmap) -> Unit
 ) {
     val context = LocalContext.current
     val prefs = remember { context.getSharedPreferences("receipt_prefs", Context.MODE_PRIVATE) }
@@ -42,8 +40,7 @@ fun ReceiptPrinterScreen(
 
     val items = remember { mutableStateListOf<EditableItem>() }
 
-    var pdfBitmap by remember { mutableStateOf<Bitmap?>(null) }
-    var pdfFile by remember { mutableStateOf<File?>(null) }
+    var bitmapPreview by remember { mutableStateOf<Bitmap?>(null) }
     var showPreview by remember { mutableStateOf(false) }
 
     Column(modifier = Modifier
@@ -119,7 +116,6 @@ fun ReceiptPrinterScreen(
             val name = if (selectedProduct == "Other") customProductName else selectedProduct
             val item = EditableItem(name, price.toDoubleOrNull() ?: 0.0, quantity.toIntOrNull() ?: 0)
             if (name.isNotBlank()) items.add(item)
-            // Reset product inputs
             selectedProduct = productOptions[0]
             price = "4.0"
             quantity = "1"
@@ -136,26 +132,37 @@ fun ReceiptPrinterScreen(
             }
         }
 
+        Spacer(Modifier.height(8.dp))
+        Button(
+            onClick = {
+                items.clear()
+                selectedProduct = productOptions[0]
+                price = "4.0"
+                quantity = "1"
+            },
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text("Reset Items")
+        }
+
         Spacer(Modifier.height(12.dp))
         Button(onClick = {
             if (customerName.isBlank() || items.isEmpty()) return@Button
-
-            val file = PdfGenerator.generateSmartReceiptPdf(context, customerName, items)
-            pdfBitmap = PdfRendererUtil.renderPdfToBitmap(context, file)
-            pdfFile = file
+            val bmp = ReceiptBitmapBuilder.buildReceiptBitmap(customerName, items)
+            bitmapPreview = bmp
             showPreview = true
         }, modifier = Modifier.fillMaxWidth()) {
             Text("Preview & Print")
         }
     }
 
-    if (showPreview && pdfBitmap != null) {
+    if (showPreview && bitmapPreview != null) {
         AlertDialog(
             onDismissRequest = { showPreview = false },
             confirmButton = {
                 TextButton(onClick = {
                     showPreview = false
-                    pdfFile?.let { onSendPdfFile(it) }
+                    bitmapPreview?.let { onSendBitmap(it) }
                 }) {
                     Text("Print Now")
                 }
@@ -168,7 +175,7 @@ fun ReceiptPrinterScreen(
             title = { Text("Receipt Preview") },
             text = {
                 Image(
-                    bitmap = pdfBitmap!!.asImageBitmap(),
+                    bitmap = bitmapPreview!!.asImageBitmap(),
                     contentDescription = null,
                     modifier = Modifier
                         .fillMaxWidth()

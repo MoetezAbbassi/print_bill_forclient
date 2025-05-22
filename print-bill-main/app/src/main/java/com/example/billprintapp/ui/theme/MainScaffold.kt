@@ -7,7 +7,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import com.example.billprintapp.utils.BluetoothPrinterHelper
-import com.example.billprintapp.utils.PdfRendererUtil
 import com.example.billprintapp.ui.ReceiptHistoryScreen
 import java.io.File
 
@@ -32,9 +31,8 @@ fun MainScaffold() {
 
                 when (selectedTab) {
                     0 -> ReceiptPrinterScreen(
-                        onSendPdfFile = { file ->
-                            val bitmap = PdfRendererUtil.renderPdfToBitmap(context, file)
-                            BluetoothPrinterHelper.showDevicePicker(context) { _ ->
+                        onSendBitmap = { bitmap ->
+                            BluetoothPrinterHelper.showDevicePicker(context) {
                                 BluetoothPrinterHelper.printBitmap(context, bitmap)
                             }
                         }
