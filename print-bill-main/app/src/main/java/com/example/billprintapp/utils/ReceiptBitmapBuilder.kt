@@ -12,7 +12,7 @@ object ReceiptBitmapBuilder {
                            vatId: String,
                            items: List<EditableItem>): Bitmap {
         val width = 576
-        val maxHeight = 2500
+        val maxHeight = 3000
         val baseBitmap = Bitmap.createBitmap(width, maxHeight, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(baseBitmap)
         canvas.drawColor(Color.WHITE)
@@ -104,8 +104,8 @@ object ReceiptBitmapBuilder {
 
         val qr = QrGenerator.generateQr("https://ice.pos/receipt?id=$invoiceId", 200)
         canvas.drawBitmap(qr, (width - 200) / 2f, y.toFloat(), null)
-        y += qr.height + 20
-        y += 130
+        y += qr.height + 100
+        y += 80
 
         return Bitmap.createBitmap(baseBitmap, 0, 0, width, y.coerceAtMost(maxHeight))
     }

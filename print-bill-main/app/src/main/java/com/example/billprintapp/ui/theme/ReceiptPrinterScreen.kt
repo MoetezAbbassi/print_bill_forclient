@@ -98,7 +98,7 @@ fun ReceiptPrinterScreen(
             OutlinedTextField(
                 value = newCustomerName,
                 onValueChange = { newCustomerName = it },
-                label = { Text("Customer Name") },
+                label = { Text("Name") },
                 modifier = Modifier.weight(1f)
             )
             Spacer(Modifier.width(8.dp))
@@ -133,7 +133,7 @@ fun ReceiptPrinterScreen(
         Divider()
         Spacer(Modifier.height(8.dp))
 
-        Text("Add Item", style = MaterialTheme.typography.titleMedium)
+        Text("Items in Receipt", style = MaterialTheme.typography.titleMedium)
         Spacer(Modifier.height(8.dp))
 
         Row(
@@ -191,8 +191,6 @@ fun ReceiptPrinterScreen(
         Spacer(Modifier.height(16.dp))
         Divider()
         Spacer(Modifier.height(8.dp))
-
-        Text("🧾 Items in Receipt", style = MaterialTheme.typography.titleMedium)
         LazyColumn(modifier = Modifier.fillMaxHeight(0.35f)) {
             items(items.size) { index ->
                 val item = items[index]
