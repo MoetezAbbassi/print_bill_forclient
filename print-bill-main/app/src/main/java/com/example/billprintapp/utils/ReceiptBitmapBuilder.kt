@@ -2,12 +2,15 @@ package com.example.billprintapp.utils
 
 import android.graphics.*
 import com.example.billprintapp.models.EditableItem
+import com.example.billprintapp.ui.ReceiptPrinterScreen
 import java.text.SimpleDateFormat
 import java.util.*
 
 object ReceiptBitmapBuilder {
 
-    fun buildReceiptBitmap(customerName: String, items: List<EditableItem>): Bitmap {
+    fun buildReceiptBitmap(customerName: String,
+                           vatId: String,
+                           items: List<EditableItem>): Bitmap {
         val width = 576
         val maxHeight = 2500
         val baseBitmap = Bitmap.createBitmap(width, maxHeight, Bitmap.Config.ARGB_8888)
@@ -62,11 +65,12 @@ object ReceiptBitmapBuilder {
         y += 30
 
         val date = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(Date())
-        val invoiceId = (100000..999999).random().toString()
+        val invoiceId = (10000..99999999).random().toString()
 
         drawLeftRight("Invoice #", invoiceId)
         drawLeftRight("Date", date)
         drawLeftRight("Customer", customerName)
+        drawLeftRight("VAT ID", vatId)
 
         y += 10
         canvas.drawLine(0f, y.toFloat(), width.toFloat(), y.toFloat(), paint)
@@ -101,7 +105,7 @@ object ReceiptBitmapBuilder {
         val qr = QrGenerator.generateQr("https://ice.pos/receipt?id=$invoiceId", 200)
         canvas.drawBitmap(qr, (width - 200) / 2f, y.toFloat(), null)
         y += qr.height + 20
-        y += 90
+        y += 130
 
         return Bitmap.createBitmap(baseBitmap, 0, 0, width, y.coerceAtMost(maxHeight))
     }
